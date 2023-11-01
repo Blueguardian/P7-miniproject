@@ -20,7 +20,7 @@ def read_images(file):
 
     return images[0], images[1:]
 
-def imgs_feature_matching(img1,img2, info=False):
+def imgs_feature_matching(img1,img2, threshold = 0.75, info=False):
 
     img1_gray = cv2.cvtColor(img1, cv2.COLOR_BGR2GRAY)
     img2_gray = cv2.cvtColor(img2, cv2.COLOR_BGR2GRAY)
@@ -37,7 +37,7 @@ def imgs_feature_matching(img1,img2, info=False):
     # Filtering matches:
     good = []
     for m, n in matches:
-        if m.distance < 0.75 * n.distance:
+        if m.distance < threshold * n.distance:
             good.append([m])
 
     # Filtering keypoints:
@@ -54,7 +54,6 @@ def imgs_feature_matching(img1,img2, info=False):
     return matches
 
 def warpTwoImages(img1, img2, H):
-    '''warp img2 to img1 with homograph H'''
     h1,w1 = img1.shape[:2]
     h2,w2 = img2.shape[:2]
     pts1 = np.float32([[0,0],[0,h1],[w1,h1],[w1,0]]).reshape(-1,1,2)
@@ -82,52 +81,22 @@ def warpTwoImages(img1, img2, H):
 
     return result
 
-def get_information_cv2Homography(matches):
-
-    # First obtain the homography from cv2.
-    matches_src, matches_dst = np.split(np.array(matches), 2, 1)
-    h, mask = cv2.findHomography(matches_src, matches_dst, cv2.RANSAC)
-
-    mask = np.array([bool(m) for m in mask]) # Change mask from 0-1 to False-True.
-
-    # Next obtain the proyection for each source point and calculate the error.
-    n_inliers = len(mask[mask])
-
-    src, dst = np.split(np.array(matches).transpose(), 2, 0)     
-    src = np.insert(src,2,1,axis=0)     # Adding 1s at the end of the point (2D -> 3D point)
-    dst = np.insert(dst,2,1,axis=0)
-
-    src_proy = np.dot(h,src)            # Multiplying all the 3D points for the homography.
-    src_proy /= src_proy[-1]            # Normalizing proyected points.
-
-    errors = np.linalg.norm(dst-src_proy, axis=0) # Errors: distance between destination position and proyected position.
-    
-    error_inliers = errors[mask]
-
-    mse = np.square(error_inliers).mean()
-    
-    print(f"[#] Result h2: {n_inliers}/{len(matches)}: {n_inliers/len(matches):.3f} ratio. MSE: {mse:.3f}\n")
-
-    return h
-
 
 
 if __name__ == "__main__":
 
-    base_image, images = read_images("media5/")
+    np.set_printoptions(suppress=True)
+
+    base_image, images = read_images("media1/")
 
 
     for image in images[:]:
         matches = imgs_feature_matching(image, base_image, info=False)
 
         # Here we calculate H with ransac:
-        h1 = ransac_homography(matches, n_samples=4, tolerance=1, max_iterations=2100, threshold=0.6, info=True)
-
-        h2 = get_information_cv2Homography(matches)
+        h1 = ransac_homography(matches, n_samples=4, tolerance=1, max_iterations=1000, threshold=0.7, info=True)
 
         base_image = warpTwoImages(base_image, image, h1)
-
-        #print(f"{h1 - h2}")
 
 
     # Resize and show the final result:

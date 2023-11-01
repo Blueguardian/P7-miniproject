@@ -1,6 +1,6 @@
 import numpy as np, random
 
-def get_homography(samples):
+def calc_homography(samples):
 
     src, dst = np.split(np.array(samples), 2, 1)
 
@@ -24,19 +24,7 @@ def get_homography(samples):
 
     return H
 
-def is_non_collinear(points_matrix):
-    p = np.append(points_matrix, points_matrix[:2],axis=0)
-
-    for i in range(4):
-        temp = p[i:3+i]
-
-        rank = np.linalg.matrix_rank(temp)
-        if rank < 2: 
-            return False
-
-    return True
-
-def ransac_homography(matches, n_samples=4, tolerance=1, max_iterations=500, threshold=1, info=False):
+def ransac_homography(matches, n_samples=4, tolerance=1, max_iterations=1000, threshold=0.7, info=False):
 
     best_inliers = 0
     best_H = np.eye(3)
@@ -55,7 +43,7 @@ def ransac_homography(matches, n_samples=4, tolerance=1, max_iterations=500, thr
         # First we get n random samples from all the matches.
         samples = random.sample(matches.tolist(), n_samples)
 
-        H = get_homography(samples)   # Obtaining the Homography matrix.                        
+        H = calc_homography(samples)   # Obtaining the Homography matrix.                        
 
         # Proyecting all the source points into the destination space using the Homography.
         src_proy = np.dot(H,matches_src)
@@ -90,7 +78,7 @@ def ransac_homography(matches, n_samples=4, tolerance=1, max_iterations=500, thr
 
     inliers = matches[best_errors] # Getting only the inliers.
 
-    refined_H = get_homography(inliers)   # Obtaining the Homography matrix with all the inliers.                        
+    refined_H = calc_homography(inliers)   # Obtaining the Homography matrix with all the inliers.                        
 
     # Proyecting all the source points into the destination space using the Homography.
     src_proy = np.dot(refined_H, matches_src)
@@ -106,10 +94,10 @@ def ransac_homography(matches, n_samples=4, tolerance=1, max_iterations=500, thr
 
 
     if info:
-        print(f"\n[#]: n of iterations done: {i+1}.")
-        print(f"[#] Result: {best_inliers}/{len(matches)}: {best_inliers/len(matches):.3f} ratio. MSE: {best_MSE:.3f}")
-        print(f"[#] Refined result: {refined_n_inliers}/{len(matches)}: {refined_n_inliers/len(matches):.3f} ratio. MSE: {refined_mse:.3f}\n")
+        print(f"\n[#] Initial result: {best_inliers}/{len(matches)}, {best_inliers/len(matches):.3f} ratio, MSE: {best_MSE:.3f}, ({i+1}/{max_iterations}) iter")
+        print(f"[#] Refined result: {refined_n_inliers}/{len(matches)}, {refined_n_inliers/len(matches):.3f} ratio, MSE: {refined_mse:.3f}\n")
 
  
+    mask = errors<=tolerance
 
     return refined_H
